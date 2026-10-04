@@ -58,35 +58,4 @@
 					 path="vendor/gms"
 					 clone-depth="1" />
 
-	<!-- Rising sixteen-qpr2 manifest pairs Lineage apps with Rising's
-	     frameworks/base, but Rising dropped Lineage custom framework APIs
-	     (DevicePolicyManager/DeviceAdminInfo additions, SupervisionManager
-	     methods, DisplayManager extern-display consts, Settings provider
-	     keys, UiModeManager force-invert, CallLog PREFERRED_DISPLAY_NAME,
-	     etc.). Rising ships its own self-consistent forks of the big
-	     consumers on branch qpr2 — use them instead of Lineage's -->
-	<remove-project name="LineageOS/android_packages_apps_Settings" />
-	<project name="RisingOS-Revived/android_packages_apps_Settings"
-					 remote="gh"
-					 revision="qpr2"
-					 path="packages/apps/Settings"
-					 clone-depth="1" />
-	<remove-project name="LineageOS/android_packages_apps_Launcher3" />
-	<project name="RisingOS-Revived/android_packages_apps_Launcher3"
-					 remote="gh"
-					 revision="qpr2"
-					 path="packages/apps/Launcher3"
-					 clone-depth="1" />
-	<remove-project name="LineageOS/android_frameworks_libs_systemui" />
-	<project name="RisingOS-Revived/android_frameworks_libs_systemui"
-					 remote="gh"
-					 revision="qpr2"
-					 path="frameworks/libs/systemui"
-					 clone-depth="1" />
-	<remove-project name="LineageOS/android_packages_services_Telecomm" />
-	<project name="RisingOS-Revived/android_packages_services_Telecomm"
-					 remote="gh"
-					 revision="qpr2"
-					 path="packages/services/Telecomm"
-					 clone-depth="1" />
 </manifest>
