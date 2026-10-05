@@ -50,9 +50,14 @@ for f in frameworks/libs/systemui/tracinglib/Android.bp \
 done
 CLBP="packages/providers/CallLogProvider/Android.bp"
 if [ -f "$CLBP" ]; then
-  if grep -q 'telecom-util-lib' "$CLBP"; then
-    sed -i 's/telecom-util-lib/telecom_utils/g' "$CLBP"
-    say "fix-4a APPLIED: telecom-util-lib -> telecom_utils"
+  if grep -q 'name: "telecom-util-lib"' packages/services/Telecomm/Android.bp 2>/dev/null; then
+    say "fix-4a provider telecom-util-lib present in packages/services/Telecomm"
+    if grep -q 'telecom_utils' "$CLBP"; then
+      sed -i 's/telecom_utils/telecom-util-lib/g' "$CLBP"
+      say "fix-4a REVERTED: telecom_utils -> telecom-util-lib in CallLogProvider/Android.bp"
+    else say "fix-4a KEEP: dep already telecom-util-lib"; fi
+  elif grep -q 'telecom-util-lib' "$CLBP"; then
+    say "fix-4a WARN: provider absent in-tree; leaving telecom-util-lib"
   else say "fix-4a SKIP"; fi
 else say "fix-4a SKIP: $CLBP not found"; fi
 CLBA="packages/providers/CallLogProvider/src/com/android/calllogbackup/CallLogBackupAgent.java"
