@@ -71,17 +71,46 @@ if [ -f "$CLBA" ]; then
     else say "fix-4b APPLIED"; fi
   else say "fix-4b SKIP"; fi
 else say "fix-4b SKIP: $CLBA not found"; fi
+# --- fix-5: SystemUI displaylib/mechanics deps (provider-aware) ---
+# displaylib/ lives at frameworks/libs/systemui/displaylib (Lineage tree HAS it;
+# Rising's fork does not). SystemUI genuinely imports com.android.app.displaylib.*
+# so when the provider module exists in-tree the dep must be PRESENT; restore it
+# if a previous run deleted it. mechanics-compose is a stale dep (no source
+# imports it) -> always drop it.
+DLBP="frameworks/libs/systemui/displaylib/Android.bp"
+MCOM="frameworks/libs/systemui/mechanics/compose/Android.bp"
+HAVE_DL=0; HAVE_MC=0
+[ -f "$DLBP" ] && grep -q 'name: "displaylib"' "$DLBP" 2>/dev/null && HAVE_DL=1
+[ -f "$MCOM" ] && grep -q 'name: "mechanics-compose"' "$MCOM" 2>/dev/null && HAVE_MC=1
+say "fix-5 providers: displaylib=$HAVE_DL mechanics-compose=$HAVE_MC"
 SUI="frameworks/base/packages/SystemUI/Android.bp"
 if [ -f "$SUI" ]; then
+  if [ "$HAVE_DL" -eq 1 ]; then
+    if grep -q '"displaylib",' "$SUI"; then
+      say "fix-5 KEEP: displaylib dep present in SystemUI/Android.bp"
+    elif git -C frameworks/base checkout -- packages/SystemUI/Android.bp 2>/dev/null; then
+      say "fix-5 RESTORED: SystemUI/Android.bp from git (displaylib dep back)"
+    else
+      say "fix-5 WARN: git checkout failed for SystemUI/Android.bp"
+    fi
+  elif grep -q '"displaylib",' "$SUI"; then
+    sed -i '/"displaylib",/d' "$SUI"; say "fix-5 APPLIED: displaylib dropped (no provider)"
+  else say "fix-5 SKIP: displaylib (no provider, no dep)"; fi
   if grep -q 'mechanics/compose:mechanics-compose' "$SUI"; then
-    sed -i '/mechanics\/compose:mechanics-compose/d' "$SUI"; say "fix-5 APPLIED: mechanics-compose dropped"; else say "fix-5 SKIP: mechanics-compose"; fi
-  if grep -q '"displaylib",' "$SUI"; then
-    sed -i '/"displaylib",/d' "$SUI"; say "fix-5 APPLIED: displaylib dropped"; else say "fix-5 SKIP: displaylib"; fi
+    sed -i '/mechanics\/compose:mechanics-compose/d' "$SUI"; say "fix-5 APPLIED: mechanics-compose dropped"
+  else say "fix-5 SKIP: mechanics-compose"; fi
 else say "fix-5 SKIP: $SUI not found"; fi
 SDEMO="development/samples/SceneTransitionLayoutDemo/Android.bp"
 if [ -f "$SDEMO" ]; then
-  if grep -q 'mechanics/compose:mechanics-compose' "$SDEMO"; then
-    sed -i '/mechanics\/compose:mechanics-compose/d' "$SDEMO"; say "fix-5 APPLIED: demo mechanics-compose dropped"; else say "fix-5 SKIP: demo mechanics-compose"; fi
+  if [ "$HAVE_MC" -eq 1 ]; then
+    if grep -q 'mechanics/compose:mechanics-compose' "$SDEMO"; then
+      say "fix-5 KEEP: demo mechanics dep present"
+    elif git -C development checkout -- samples/SceneTransitionLayoutDemo/Android.bp 2>/dev/null; then
+      say "fix-5 RESTORED: demo Android.bp from git"
+    else say "fix-5 WARN: git checkout failed for demo Android.bp"; fi
+  elif grep -q 'mechanics/compose:mechanics-compose' "$SDEMO"; then
+    sed -i '/mechanics\/compose:mechanics-compose/d' "$SDEMO"; say "fix-5 APPLIED: demo mechanics-compose dropped"
+  else say "fix-5 SKIP: demo mechanics-compose"; fi
 else say "fix-5 SKIP: $SDEMO not found"; fi
 say "all inline fixes done"
 FIXEOF
