@@ -75,8 +75,8 @@ else say "fix-4b SKIP: $CLBA not found"; fi
 # displaylib/ lives at frameworks/libs/systemui/displaylib (Lineage tree HAS it;
 # Rising's fork does not). SystemUI genuinely imports com.android.app.displaylib.*
 # so when the provider module exists in-tree the dep must be PRESENT; restore it
-# if a previous run deleted it. mechanics-compose is a stale dep (no source
-# imports it) -> always drop it.
+# if a previous run deleted it. mechanics-compose is needed by Rising's Kotlin
+# sources (OverlayShade, QS Tile) -> restore it too when its provider exists.
 DLBP="frameworks/libs/systemui/displaylib/Android.bp"
 MCOM="frameworks/libs/systemui/mechanics/compose/Android.bp"
 HAVE_DL=0; HAVE_MC=0
