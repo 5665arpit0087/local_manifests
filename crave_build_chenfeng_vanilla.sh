@@ -122,6 +122,35 @@ if [ -f "$SDEMO" ]; then
   else say "fix-5 SKIP: demo mechanics-compose"; fi
 else say "fix-5 SKIP: $SDEMO not found"; fi
 say "all inline fixes done"
+# --- fix-6: lineage sepolicy rw_dir_file macro (never reaches M4 in Rising builds) ---
+# device/lineage/sepolicy/common/public/te_macros defines rw_dir_file, but its
+# include path is absent, so checkpolicy dies with 'syntax error'. Inline-expand
+# with the exact upstream definition:
+#   rw_dir_file(X, Y) -> allow X Y:dir r_dir_perms; + allow X Y:{ file lnk_file } rw_file_perms;
+for f in device/lineage/sepolicy/qcom/vendor/hal_lineage_health_default.te \
+         device/lineage/sepolicy/qcom/vendor/hal_perf_default.te \
+         device/lineage/sepolicy/qcom/vendor/hal_power_default.te; do
+  if [ -f "$f" ]; then
+    if grep -q '^rw_dir_file(' "$f"; then
+      sed -i -E 's/^rw_dir_file\(([A-Za-z0-9_]+), ([A-Za-z0-9_]+)\)$/allow \1 \2:dir r_dir_perms;\nallow \1 \2:{ file lnk_file } rw_file_perms;/' "$f"
+      if grep -q '^rw_dir_file(' "$f"; then
+        say "fix-6 WARN: residue in $(basename "$f"):"; grep -n '^rw_dir_file(' "$f" || true
+      else
+        say "fix-6 APPLIED: expanded rw_dir_file in $(basename "$f")"
+      fi
+    else
+      say "fix-6 SKIP: no rw_dir_file in $(basename "$f")"
+    fi
+  else
+    say "fix-6 SKIP: $f not found"
+  fi
+done
+REMNANTS=$(grep -rn '^rw_dir_file(' device/lineage/sepolicy/ 2>/dev/null || true)
+if [ -n "$REMNANTS" ]; then
+  say "fix-6 WARN: other rw_dir_file users remain:"; echo "$REMNANTS" | head -20
+else
+  say "fix-6 sweep clean: no rw_dir_file left under device/lineage/sepolicy"
+fi
 FIXEOF
 source build/envsetup.sh \
 && lunch rising_chenfeng-user \
