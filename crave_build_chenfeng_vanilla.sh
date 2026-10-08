@@ -151,6 +151,29 @@ if [ -n "$REMNANTS" ]; then
 else
   say "fix-6 sweep clean: no rw_dir_file left under device/lineage/sepolicy"
 fi
+# --- fix-7: lineage sepolicy undeclared attributes (same include-path root cause) ---
+# checkpolicy fails 'attribute X is not declared' for typeattribute lines whose
+# attribute exists nowhere in the compiled inputs (e.g. hal_lineage_livedisplay
+# server attribute; neither upstream declares it). Diagnose repo state (builder
+# copy has differed from upstream HEAD before: stale checkout / mid-rebase),
+# then comment out the offending line if the attribute is truly absent.
+SP_LIVE="device/lineage/sepolicy/qcom/vendor/hal_lineage_livedisplay_qti.te"
+if [ -d device/lineage/sepolicy ]; then
+  say "fix-7 sepolicy repo state:"; git -C device/lineage/sepolicy log --oneline -3 2>/dev/null || say "fix-7 WARN: git log unreadable"; git -C device/lineage/sepolicy diff --stat 2>/dev/null | head -10 || true
+  if [ -f "$SP_LIVE" ]; then
+    if grep -q '^typeattribute hal_lineage_livedisplay_qti hal_lineage_livedisplay_server;' "$SP_LIVE"; then
+      if grep -rq '^attribute hal_lineage_livedisplay_server;' device/lineage/sepolicy/ 2>/dev/null || grep -rq '^attribute hal_lineage_livedisplay_server;' system/sepolicy/ 2>/dev/null; then
+        say "fix-7 KEEP: hal_lineage_livedisplay_server declared somewhere"
+      else
+        sed -i 's/^typeattribute hal_lineage_livedisplay_qti hal_lineage_livedisplay_server;/# fix-7: hal_lineage_livedisplay_server never declared in-tree/' "$SP_LIVE"
+        say "fix-7 APPLIED: neutralized undeclared-attribute typeattribute in hal_lineage_livedisplay_qti.te"
+      fi
+    else
+      say "fix-7 SKIP: no livedisplay_server typeattribute line"
+    fi
+  else say "fix-7 SKIP: $SP_LIVE not found"; fi
+  say "fix-7 sweep: typeattribute lines in lineage qcom/vendor:"; grep -rhn '^typeattribute ' device/lineage/sepolicy/qcom/vendor/ 2>/dev/null | head -20 || true
+else say "fix-7 SKIP: device/lineage/sepolicy not found"; fi
 FIXEOF
 source build/envsetup.sh \
 && lunch rising_chenfeng-user \
