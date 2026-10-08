@@ -174,6 +174,26 @@ if [ -d device/lineage/sepolicy ]; then
   else say "fix-7 SKIP: $SP_LIVE not found"; fi
   say "fix-7 sweep: typeattribute lines in lineage qcom/vendor:"; grep -rhn '^typeattribute ' device/lineage/sepolicy/qcom/vendor/ 2>/dev/null | head -20 || true
 else say "fix-7 SKIP: device/lineage/sepolicy not found"; fi
+# --- fix-8: livedisplay attribute gone from source but still compiled => stale sepolicy intermediates ---
+# 304256 and 304473 both failed at the SAME concatenated position (line 69857) even
+# though the working-tree .te no longer contains the line (fix-7 verified clean,
+# upstream HEAD verified clean). Identical offset across runs means the compiled
+# input did not change -> out/soong/.intermediates/system/sepolicy/* is stale.
+say "fix-8 workspace-wide hunt for livedisplay_server references:"
+HUNT=$(grep -rn --include='*.te' 'hal_lineage_livedisplay_server' device/ vendor/ hardware/ system/ frameworks/ packages/ 2>/dev/null | head -30 || true)
+if [ -n "$HUNT" ]; then echo "$HUNT"; else say "fix-8 hunt: no .te references anywhere in tree"; fi
+DLFILE="device/lineage/sepolicy/qcom/vendor/hal_lineage_livedisplay_qti.te"
+if [ -f "$DLFILE" ]; then
+  say "fix-8 first 3 lines (cat -A, reveals CR/hidden chars):"; cat -A "$DLFILE" | sed -n '1,3p' | head -5
+  if grep -q 'hal_lineage_livedisplay_server' "$DLFILE"; then
+    sed -i 's/typeattribute hal_lineage_livedisplay_qti hal_lineage_livedisplay_server;/# fix-8: undeclared attribute neutralized/' "$DLFILE"
+    say "fix-8 APPLIED: neutralized in $DLFILE"
+  fi
+fi
+if [ -d out/soong/.intermediates/system/sepolicy ]; then
+  rm -rf out/soong/.intermediates/system/sepolicy
+  say "fix-8 REMOVED stale intermediates: out/soong/.intermediates/system/sepolicy (single module, not rm -rf out)"
+else say "fix-8 no stale intermediates dir present"; fi
 FIXEOF
 source build/envsetup.sh \
 && lunch rising_chenfeng-user \
