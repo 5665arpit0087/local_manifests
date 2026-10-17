@@ -280,6 +280,39 @@ if [ -f "$BC" ]; then
 else
   say "fix-13 SKIP: $BC not found"
 fi
+# --- fix-14: duplicate property_contexts prefix 'persist.vendor.camera.' ---
+# The host_init_verifier steps ("Copy init script: ...") merge plat/system_ext/
+# product/vendor/odm property_contexts into one table and hard-fail when a key is
+# declared twice. Job 306115 was the first to ever reach those steps:
+#   host_init_verifier: Unable to serialize property contexts: Duplicate prefix
+#   match detected for 'persist.vendor.camera.'      (~21% of mka)
+# The pair:
+#   device/xiaomi/chenfeng/sepolicy/vendor/property_contexts -> vendor_persist_camera_prop
+#   device/qcom/sepolicy_vndr/sm8650/generic/vendor/common/property_contexts
+#                                                           -> vendor_camera_prop
+# qcom's vendor camera stack is typed against vendor_camera_prop
+# (generic/vendor/common/cameraserver.te: get_prop(cameraserver, vendor_camera_prop);
+# hal_camera.te: set_prop(hal_camera, vendor_camera_prop)), and neither the upstream
+# chenfeng tree nor official Xiaomi trees (e.g. sm8550-common) redeclare the prefix --
+# the Rising fork of the device tree added the redundant line. Keep the qcom mapping,
+# drop the device-tree one. cameraserver's persist-camera reads are separate and stay
+# intact: QSSI generic/private maps persist.vendor.camera.privapp.list and lineage
+# common/private maps the aux-camera props, both to vendor_persist_camera_prop.
+DEVPCTX="device/xiaomi/chenfeng/sepolicy/vendor/property_contexts"
+echo "[chenfeng-fix] fix-14 scan: property_contexts files declaring 'persist.vendor.camera.':"
+grep -rns --include=property_contexts '^persist\.vendor\.camera\.' \
+  device/qcom device/lineage device/xiaomi vendor/lineage 2>/dev/null | head -n 10 || true
+if [ -f "$DEVPCTX" ]; then
+  if grep -q '^persist\.vendor\.camera\.' "$DEVPCTX"; then
+    sed -i '/^persist\.vendor\.camera\./d' "$DEVPCTX"
+    say "fix-14 APPLIED: dropped duplicate persist.vendor.camera. line from device property_contexts"
+  else
+    say "fix-14 KEEP: device property_contexts has no persist.vendor.camera. line"
+  fi
+  grep -n 'persist\.vendor\.camera\.' "$DEVPCTX" || true
+else
+  say "fix-14 SKIP: $DEVPCTX not found"
+fi
 FIXEOF
 source build/envsetup.sh \
 && lunch rising_chenfeng-user \
