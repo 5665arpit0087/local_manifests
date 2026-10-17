@@ -245,6 +245,41 @@ if grep -q 'device/lineage/sepolicy/common/public' "$BC" 2>/dev/null; then
 else
   say "fix-12 WARN: keeping $WP (common dirs not registered)"
 fi
+# --- fix-13: lineage mosey sepolicy dirs (mosey_app was never declared) ---
+# Rising's private/compat/34.0/34.0.cil adds the mapping 'mosey_app_34_0 -> mosey_app'
+# (commit 64fe3aff33 "sepolicy: Add mosey_app to compat mapping") and MoseyApp ships in
+# this build (vendor/gms/system_ext/packages/privileged_apps/MoseyApp), but nothing ever
+# registered device/lineage/sepolicy/mosey, so 34.0_compat_test died at:
+#   Failed to resolve typeattributeset statement at .../plat_34.0.cil:2068
+# Only the 34.0 test failed because combine_maps() propagates a mapping only into
+# version maps that already carry the name, and mosey_app appears solely in the 34.0 map.
+# Rising's own device_lineage_sepolicy/common/sepolicy.mk registers all three dirs for
+# every non-Pixel-buds target, so mirror it:
+#   mosey/system_ext/public  -> SYSTEM_EXT_PUBLIC  (declares 'type mosey_app, domain;')
+#   mosey/system_ext/private -> SYSTEM_EXT_PRIVATE (app_domain/net_domain/coredomain,
+#                                                   seapp_contexts for the Mosey app)
+#   mosey/vendor             -> BOARD_VENDOR       (mosey_server/mosey_service domains)
+if [ -f "$BC" ]; then
+  if grep -q 'device/lineage/sepolicy/mosey' "$BC"; then
+    say "fix-13 KEEP: lineage mosey sepolicy dirs already registered"
+  else
+    sed -i '/^SYSTEM_EXT_PUBLIC_SEPOLICY_DIRS += device\/lineage\/sepolicy\/common\/public$/a SYSTEM_EXT_PUBLIC_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/system_ext/public' "$BC" || true
+    sed -i '/^SYSTEM_EXT_PUBLIC_SEPOLICY_DIRS += device\/lineage\/sepolicy\/mosey\/system_ext\/public$/a SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/system_ext/private' "$BC" || true
+    sed -i '/^SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += device\/lineage\/sepolicy\/mosey\/system_ext\/private$/a BOARD_VENDOR_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/vendor' "$BC" || true
+    if grep -q 'device/lineage/sepolicy/mosey' "$BC"; then
+      say "fix-13 APPLIED: registered lineage mosey sepolicy dirs in BoardConfig.mk"
+    else
+      say "fix-13 WARN: sed anchor missed; appending to end of BoardConfig.mk"
+      printf '\nSYSTEM_EXT_PUBLIC_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/system_ext/public\nSYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/system_ext/private\nBOARD_VENDOR_SEPOLICY_DIRS += device/lineage/sepolicy/mosey/vendor\n' >> "$BC"
+    fi
+  fi
+  for d in device/lineage/sepolicy/mosey/system_ext/public device/lineage/sepolicy/mosey/system_ext/private device/lineage/sepolicy/mosey/vendor; do
+    if [ -d "$d" ]; then say "fix-13 dir present: $d"; else say "fix-13 WARN: dir missing: $d"; fi
+  done
+  grep -n 'lineage/sepolicy/mosey' "$BC" || true
+else
+  say "fix-13 SKIP: $BC not found"
+fi
 FIXEOF
 source build/envsetup.sh \
 && lunch rising_chenfeng-user \
